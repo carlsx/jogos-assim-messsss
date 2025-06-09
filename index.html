@@ -1,0 +1,915 @@
+
+The user wants an FMC simulator visually and functionally much more like the real Airbus and Boeing FMCs, so that even an expert might not easily tell the difference. Also, following the "DEFAULT" design guidelines that emphasize a minimal, elegant UI that is light-themed with bold typography, crisp spacing, subtle shadows, and an excellent developer-experience look akin to a high-end component library homepage.
+
+This means:
+- The FMC UI must use a clean white background, subtle card shadows, and generous spacing with clearly defined but soft layout regions.
+- Use a larger heading hierarchy for the header.
+- Use monospace for the FMC screen text but with modern, refined styling.
+- Include LSK buttons on left and right sides that look authentic visually (maybe subtle outlines or subtle highlight on hover).
+- The content on the FMC screen must resemble real FMC text layouts, with line labels, aligned columns for waypoints, and performance data in a style that imitates real flight computer screens but still clean.
+- The keypad below is stylized with consistent subtle shadows and smooth states.
+- The entire interface must be a single HTML file with inline CSS and JS.
+- The code should be semantic, accessible, and demonstrate real FMC behaviors including flight plan editing, leg editing, input buffer with EXEC functionality.
+- Use a consistent font: Poppins for headings and general UI, monospace for the FMC screen text.
+- Use grid and flex for layout, CSS variables for theming.
+- Provide smooth transitions on interactive elements.
+- Provide visible page navigation controls consistent with FMC function.
+
+Plan:
+- Create a sticky top header with the FMC label & small nav for Init, Route, Perf, Legs, Menu (like tabs).
+- The main FMC area with:
+  - Left and right side "LSK" buttons with subtle arrow brackets.
+  - Center FMC screen with a monospace styled "green CRT text" nostalgic vibe but with clean modern light UI.
+- The keypad below with keys arranged in standard layout for alphabets plus CLR, DEL, EXEC keys.
+- Flight plan shown with index and waypoints in aligned columns.
+- Input buffer displayed with a blinking cursor style to show typing.
+- Implement all page switching and line select keys behavior for realistic FMC simulation.
+- Responsive and accessible ARIA roles.
+- Implement constrained input, validation, tooltips or labels where fit.
+- Subtle shadows on cards and buttons.
+- Animations for button press and tab transitions.
+
+I will generate a robust, polished single page that accomplishes this with semantic HTML, modern CSS and rich JavaScript logic for the FMC behavior.
+
+Now proceeding to produce the full FMC simulator HTML file accordingly.
+
+
+`fmc-simulator.html`
+```html
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FMC Simulator - Realistic Airbus/Boeing</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&amp;display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --clr-bg: #ffffff;
+      --clr-primary: #0a3e85;
+      --clr-primary-light: #3a67c1;
+      --clr-primary-dark: #06234d;
+      --clr-secondary: #6b7280;
+      --clr-gray-light: #e5e7eb;
+      --clr-gray-lighter: #f9fafb;
+      --clr-text: #374151;
+      --clr-accent: #2563eb;
+      --clr-green-crt: #01875f;
+      --clr-shadow-light: rgba(0,0,0,0.06);
+      --clr-shadow-hover: rgba(0,0,0,0.10);
+      --border-radius: 0.75rem;
+      --font-sans: 'Poppins', sans-serif;
+      --font-mono: 'Courier New', Courier, monospace;
+      --transition-fast: 0.2s ease;
+    }
+
+    /* Reset */
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0; padding: 0;
+      background: var(--clr-bg);
+      font-family: var(--font-sans);
+      color: var(--clr-text);
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 2rem 1rem 3rem;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      user-select: none;
+    }
+    h1 {
+      font-size: 3.5rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      margin-bottom: 1rem;
+      color: var(--clr-primary);
+      user-select: none;
+    }
+
+    /* Sticky top header nav */
+    header {
+      position: sticky;
+      top: 0;
+      background: var(--clr-bg);
+      box-shadow: 0 2px 12px var(--clr-shadow-light);
+      width: 100%;
+      max-width: 1200px;
+      z-index: 20;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+    }
+    .logo {
+      font-weight: 800;
+      font-size: 1.75rem;
+      color: var(--clr-primary);
+      letter-spacing: 0.05em;
+    }
+    nav {
+      display: flex;
+      gap: 2rem;
+    }
+    nav a {
+      font-weight: 600;
+      font-size: 1.1rem;
+      text-decoration: none;
+      color: var(--clr-secondary);
+      transition: color var(--transition-fast);
+      padding: 0.3rem 0.5rem;
+      border-radius: 0.4rem;
+      white-space: nowrap;
+    }
+    nav a[aria-current="page"],
+    nav a:hover,
+    nav a:focus {
+      color: var(--clr-primary);
+      outline: none;
+      background: var(--clr-gray-lighter);
+      box-shadow: 0 0 5px var(--clr-shadow-hover);
+    }
+
+    main {
+      width: 100%;
+      max-width: 480px;
+      background: var(--clr-gray-lighter);
+      border-radius: var(--border-radius);
+      box-shadow: 0 16px 35px var(--clr-shadow-light);
+      display: grid;
+      grid-template-columns: 72px 1fr 72px;
+      grid-template-rows: 64px 1fr 130px 48px;
+      overflow: hidden;
+      user-select: none;
+    }
+    /* FMC header bar */
+    #fmc-header {
+      grid-column: 1 / 4;
+      background: var(--clr-primary);
+      color: white;
+      font-weight: 700;
+      font-size: 1.3rem;
+      line-height: 64px;
+      padding: 0 1.5rem;
+      letter-spacing: 0.08em;
+      user-select: none;
+      user-drag: none;
+    }
+    /* Left and right line select columns */
+    .line-select-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 1rem 0;
+      user-select: none;
+    }
+    .line-select-col.left {
+      grid-column: 1 / 2;
+      padding-left: 1rem;
+    }
+    .line-select-col.right {
+      grid-column: 3 / 4;
+      padding-right: 1rem;
+      align-items: flex-end;
+    }
+    /* Line Select Key Buttons */
+    button.lsk-btn {
+      background: transparent;
+      border: none;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 1.35rem;
+      color: var(--clr-primary-dark);
+      cursor: pointer;
+      line-height: 1;
+      padding: 0.5rem 2px;
+      user-select: none;
+      transition: color var(--transition-fast);
+      text-align: left;
+      display: block;
+      width: 100%;
+      min-height: 2.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .line-select-col.right button.lsk-btn {
+      text-align: right;
+    }
+    /* Arrow brackets for LSK buttons */
+    button.lsk-btn.left::before {
+      content: "<";
+      color: var(--clr-primary);
+      font-weight: 900;
+      margin-right: 2px;
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      user-select: none;
+      pointer-events: none;
+    }
+    button.lsk-btn.right::after {
+      content: ">";
+      color: var(--clr-primary);
+      font-weight: 900;
+      margin-left: 2px;
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      user-select: none;
+      pointer-events: none;
+    }
+    button.lsk-btn:hover,
+    button.lsk-btn:focus {
+      color: var(--clr-primary-light);
+      outline: none;
+      background: var(--clr-gray-light);
+      box-shadow: 0 0 8px var(--clr-shadow-hover);
+      border-radius: 0.3rem;
+    }
+    button.lsk-btn:active {
+      color: var(--clr-primary-dark);
+      transform: scale(0.94);
+      transition: transform 0.1s ease;
+    }
+
+    /* MAIN FMC Screen */
+    #fmc-screen {
+      grid-column: 2 / 3;
+      background: #011a14;
+      border-radius: 0.5rem;
+      box-shadow: inset 0 0 40px #0d3b31;
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      color: var(--clr-green-crt);
+      padding: 2rem 2.2rem;
+      line-height: 1.3;
+      white-space: pre-wrap;
+      overflow-y: auto;
+      user-select: none;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    #fmc-screen:focus {
+      outline: 2px solid var(--clr-primary-light);
+      outline-offset: 2px;
+    }
+    #fmc-screen h2 {
+      font-family: var(--font-sans);
+      color: var(--clr-primary-light);
+      font-size: 1.4rem;
+      margin-top: 0; margin-bottom: 0.6rem;
+      font-weight: 700;
+      user-select: none;
+    }
+    /* Screen text lines */
+    .screen-line {
+      display: flex;
+      justify-content: space-between;
+      margin: 0.15rem 0;
+    }
+    .screen-line label {
+      flex-shrink: 0;
+      width: 50%;
+      letter-spacing: 0.04em;
+    }
+    .screen-line .value {
+      flex-grow: 1;
+      text-align: right;
+      letter-spacing: 0.04em;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    /* Flightplan table for ROUTE and LEGS */
+    table.fmc-table {
+      color: var(--clr-green-crt);
+      font-size: 0.95rem;
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.6rem;
+      user-select: none;
+    }
+    table.fmc-table thead {
+      border-bottom: 1px solid #036647;
+    }
+    table.fmc-table th,
+    table.fmc-table td {
+      padding: 6px 10px;
+      text-align: left;
+    }
+    table.fmc-table th {
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      user-select: none;
+    }
+    table.fmc-table tr:hover {
+      background-color: #034d41cc;
+    }
+    /* Delete button on legs page */
+    .delete-wp {
+      background: transparent;
+      border: none;
+      color: #dc2626;
+      font-weight: 900;
+      cursor: pointer;
+      font-size: 1.25rem;
+      line-height: 1;
+      padding: 0;
+      user-select: none;
+      transition: color var(--transition-fast);
+    }
+    .delete-wp:hover,
+    .delete-wp:focus {
+      color: #b91c1c;
+      outline: none;
+    }
+
+    /* Input buffer display with blinking cursor */
+    .input-buffer {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      color: var(--clr-green-crt);
+      border-bottom: 2px solid var(--clr-green-crt);
+      width: fit-content;
+      padding-right: 3px;
+      animation: blink 1.1s steps(2, start) infinite;
+      user-select: none;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    @keyframes blink {
+      0%, 50%, 100% {
+        border-color: var(--clr-green-crt);
+      }
+      25%, 75% {
+        border-color: transparent;
+      }
+    }
+
+    /* Warning message */
+    .fmc-warning {
+      color: #dc2626;
+      font-weight: 700;
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      user-select: none;
+    }
+
+    /* Bottom keypad */
+    #fmc-keypad {
+      grid-column: 1 / 4;
+      background: var(--clr-gray-lighter);
+      border-bottom-left-radius: var(--border-radius);
+      border-bottom-right-radius: var(--border-radius);
+      box-shadow: 0 8px 24px var(--clr-shadow-light);
+      padding: 1.1rem 1.75rem;
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      gap: 0.6rem;
+      user-select: none;
+    }
+    #fmc-keypad button {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 1.15rem;
+      background: var(--clr-bg);
+      border: 2px solid var(--clr-primary);
+      border-radius: 0.55rem;
+      color: var(--clr-primary-dark);
+      padding: 0.75rem 0;
+      cursor: pointer;
+      transition: 
+        background-color var(--transition-fast),
+        color var(--transition-fast),
+        border-color var(--transition-fast),
+        transform 0.1s ease;
+      user-select: none;
+    }
+    #fmc-keypad button:hover,
+    #fmc-keypad button:focus-visible {
+      background-color: var(--clr-primary-light);
+      color: white;
+      border-color: var(--clr-primary-light);
+      outline: none;
+    }
+    #fmc-keypad button:active {
+      transform: scale(0.92);
+      border-color: var(--clr-primary-dark);
+      background-color: var(--clr-primary-dark);
+      color: var(--clr-bg);
+    }
+
+    /* Responsive smaller screens */
+    @media (max-width: 520px) {
+      main {
+        width: 100%;
+        max-width: 100vw;
+        grid-template-columns: 56px 1fr 56px;
+        grid-template-rows: 56px 1fr 110px 48px;
+      }
+      #fmc-header {
+        font-size: 1.15rem;
+        letter-spacing: 0.06em;
+      }
+      button.lsk-btn {
+        font-size: 1.15rem;
+        min-height: 2.2rem;
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
+      }
+      #fmc-screen {
+        font-size: 0.95rem;
+        padding: 1.5rem 1.8rem;
+      }
+      #fmc-keypad {
+        grid-template-columns: repeat(7, 1fr);
+        padding: 1rem 1.25rem;
+        gap: 0.5rem;
+      }
+      #fmc-keypad button {
+        font-size: 1rem;
+        padding: 0.6rem 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo" aria-label="Flight Management Computer Simulator">FMC Simulator</div>
+    <nav aria-label="FMC page navigation">
+      <a href="#" id="nav-init" aria-current="page" tabindex="0">INIT</a>
+      <a href="#" id="nav-route" tabindex="0">ROUTE</a>
+      <a href="#" id="nav-perf" tabindex="0">PERF</a>
+      <a href="#" id="nav-legs" tabindex="0">LEGS</a>
+      <a href="#" id="nav-menu" tabindex="0">MENU</a>
+    </nav>
+  </header>
+
+  <main role="application" aria-label="Flight Management Computer Simulator" aria-live="polite" aria-atomic="true">
+    <div id="fmc-header">INIT PAGE</div>
+    
+    <section class="line-select-col left" aria-label="Left Line Select Keys">
+      <button class="lsk-btn left" data-lsk="L1" aria-label="Line Select Key Left 1" title="LSK L1"></button>
+      <button class="lsk-btn left" data-lsk="L2" aria-label="Line Select Key Left 2" title="LSK L2"></button>
+      <button class="lsk-btn left" data-lsk="L3" aria-label="Line Select Key Left 3" title="LSK L3"></button>
+      <button class="lsk-btn left" data-lsk="L4" aria-label="Line Select Key Left 4" title="LSK L4"></button>
+      <button class="lsk-btn left" data-lsk="L5" aria-label="Line Select Key Left 5" title="LSK L5"></button>
+      <button class="lsk-btn left" data-lsk="L6" aria-label="Line Select Key Left 6" title="LSK L6"></button>
+    </section>
+
+    <section id="fmc-screen" tabindex="0" aria-label="FMC Display Screen" role="document" ></section>
+
+    <section class="line-select-col right" aria-label="Right Line Select Keys">
+      <button class="lsk-btn right" data-lsk="R1" aria-label="Line Select Key Right 1" title="LSK R1"></button>
+      <button class="lsk-btn right" data-lsk="R2" aria-label="Line Select Key Right 2" title="LSK R2"></button>
+      <button class="lsk-btn right" data-lsk="R3" aria-label="Line Select Key Right 3" title="LSK R3"></button>
+      <button class="lsk-btn right" data-lsk="R4" aria-label="Line Select Key Right 4" title="LSK R4"></button>
+      <button class="lsk-btn right" data-lsk="R5" aria-label="Line Select Key Right 5" title="LSK R5"></button>
+      <button class="lsk-btn right" data-lsk="R6" aria-label="Line Select Key Right 6" title="LSK R6"></button>
+    </section>
+
+    <section id="fmc-keypad" aria-label="FMC Keypad">
+      <button data-key="Q" aria-label="Key Q">Q</button>
+      <button data-key="W" aria-label="Key W">W</button>
+      <button data-key="E" aria-label="Key E">E</button>
+      <button data-key="R" aria-label="Key R">R</button>
+      <button data-key="T" aria-label="Key T">T</button>
+      <button data-key="Y" aria-label="Key Y">Y</button>
+      <button data-key="U" aria-label="Key U">U</button>
+      <button data-key="I" aria-label="Key I">I</button>
+      <button data-key="O" aria-label="Key O">O</button>
+      <button data-key="P" aria-label="Key P">P</button>
+
+      <button data-key="A" aria-label="Key A">A</button>
+      <button data-key="S" aria-label="Key S">S</button>
+      <button data-key="D" aria-label="Key D">D</button>
+      <button data-key="F" aria-label="Key F">F</button>
+      <button data-key="G" aria-label="Key G">G</button>
+      <button data-key="H" aria-label="Key H">H</button>
+      <button data-key="J" aria-label="Key J">J</button>
+      <button data-key="K" aria-label="Key K">K</button>
+      <button data-key="L" aria-label="Key L">L</button>
+      <button data-key="DEL" aria-label="Delete Key">DEL</button>
+
+      <button data-key="Z" aria-label="Key Z">Z</button>
+      <button data-key="X" aria-label="Key X">X</button>
+      <button data-key="C" aria-label="Key C">C</button>
+      <button data-key="V" aria-label="Key V">V</button>
+      <button data-key="B" aria-label="Key B">B</button>
+      <button data-key="N" aria-label="Key N">N</button>
+      <button data-key="M" aria-label="Key M">M</button>
+      <button data-key="CLR" aria-label="Clear Key">CLR</button>
+      <button data-key="SPACE" aria-label="Space Key">&nbsp;</button>
+      <button data-key="EXEC" aria-label="Execute Key">EXEC</button>
+    </section>
+  </main>
+
+  <script>
+    class FMC {
+      constructor() {
+        this.currentPage = 'init'; // init, route, perf, legs, menu
+
+        this.flightPlan = [
+          { waypoint: 'KJFK', info: 'John F Kennedy Intl' },
+          { waypoint: 'DCT', info: 'Direct' },
+          { waypoint: 'MLB', info: 'Melbourne' },
+          { waypoint: 'ORL', info: 'Orlando Exec' }
+        ];
+
+        this.performanceData = {
+          costIndex: 45,
+          cruiseFL: 350,
+          cruiseIAS: 450
+        };
+
+        this.inputBuffer = '';
+        this.warningMessage = '';
+        this.selectedLegIndex = null;
+
+        this.pages = {
+          init: {
+            title: 'INIT PAGE',
+            leftKeys: ['IDX', 'POS INIT', 'RTE FILE', 'SETTINGS', 'NAV RAD', 'VNAV'],
+            rightKeys: ['PREV', 'N1 LIM', 'FIX INFO', 'MSG', 'CLR', 'EXEC']
+          },
+          route: {
+            title: 'ROUTE PAGE',
+            leftKeys: ['DEP/ARR', 'ORIGIN', 'DEST', 'ROUTE', 'AIRWAYS', 'HOLD'],
+            rightKeys: ['ALTITUDE', 'SPEED', 'VNAV', 'LEGS', 'MENU', 'EXEC']
+          },
+          perf: {
+            title: 'PERFORMANCE PAGE',
+            leftKeys: ['INIT', 'QNH', 'COST INDEX', 'T/O', 'CRZ', 'LDG'],
+            rightKeys: ['FUEL', 'WTS BAL', 'PROG', 'ECON', 'MSG', 'EXEC']
+          },
+          legs: {
+            title: 'LEGS PAGE',
+            leftKeys: ['DEL WP', 'MOD WP', 'HELP', 'COPY', 'PASTE', 'MENU'],
+            rightKeys: ['ACTIVATE', 'ALT DESC', 'HOLD', 'NEXT', 'PREV', 'EXEC']
+          },
+          menu: {
+            title: 'FMC MENU',
+            leftKeys: ['INIT', 'RTE', 'PERF', 'LEGS', 'RAD NAV', 'INHIBIT'],
+            rightKeys: ['FIX INFO', 'MSG', 'POS INIT', 'VNAV', 'PROG', 'EXEC']
+          }
+        };
+
+        // Elements
+        this.lskLeftButtons = Array.from(document.querySelectorAll('.line-select-col.left button.lsk-btn'));
+        this.lskRightButtons = Array.from(document.querySelectorAll('.line-select-col.right button.lsk-btn'));
+        this.screen = document.getElementById('fmc-screen');
+        this.header = document.getElementById('fmc-header');
+        this.keypad = document.getElementById('fmc-keypad');
+        this.navLinks = {
+          init: document.getElementById('nav-init'),
+          route: document.getElementById('nav-route'),
+          perf: document.getElementById('nav-perf'),
+          legs: document.getElementById('nav-legs'),
+          menu: document.getElementById('nav-menu')
+        };
+
+        // Bind line select keys
+        this.lskLeftButtons.forEach((btn, i) => btn.addEventListener('click', () => this.handleLSK('L', i)));
+        this.lskRightButtons.forEach((btn, i) => btn.addEventListener('click', () => this.handleLSK('R', i)));
+
+        // Bind keypad keys
+        this.keypad.addEventListener('click', e => {
+          if (e.target.tagName === 'BUTTON') {
+            this.handleKeypad(e.target.getAttribute('data-key'));
+          }
+        });
+
+        // Navigation links
+        Object.entries(this.navLinks).forEach(([page, el]) => {
+          el.addEventListener('click', ev => {
+            ev.preventDefault();
+            this.switchPage(page);
+          });
+        });
+
+        this.render();
+        this.screen.focus();
+      }
+
+      switchPage(page) {
+        if (!this.pages[page] || this.currentPage === page) return;
+        this.currentPage = page;
+        this.inputBuffer = '';
+        this.warningMessage = '';
+        this.selectedLegIndex = null;
+        this.render();
+      }
+
+      handleLSK(side, idx) {
+        const page = this.pages[this.currentPage];
+        if (!page) return;
+        const keyLabel = side === 'L' ? page.leftKeys[idx] : page.rightKeys[idx];
+        if (!keyLabel) return;
+
+        // Map keys that change pages
+        const pageKeys = {'INIT': 'init','RTE':'route','PERF':'perf','LEGS':'legs','MENU':'menu','VNAV':'perf','RAD NAV':'menu'};
+
+        // Actions by keyLabel and current page
+        switch(keyLabel) {
+          case 'EXEC':
+            this.handleExecute();
+            break;
+          case 'MENU':
+            this.switchPage('menu');
+            break;
+          case 'LEGS':
+            this.switchPage('legs');
+            break;
+          case 'RTE FILE':
+          case 'ROUTE':
+            this.switchPage('route');
+            break;
+          case 'PERF':
+            this.switchPage('perf');
+            break;
+          case 'INIT':
+            this.switchPage('init');
+            break;
+          case 'DEL WP':
+            if (this.currentPage === 'legs' && this.selectedLegIndex !== null) {
+              this.deleteLeg(this.selectedLegIndex);
+            } else {
+              this.addWarning("Select leg before deleting");
+            }
+            break;
+          case 'NEXT':
+            this.changeLegSelection(1);
+            break;
+          case 'PREV':
+            this.changeLegSelection(-1);
+            break;
+          default:
+            if (keyLabel in pageKeys) {
+              this.switchPage(pageKeys[keyLabel]);
+            } else {
+              this.addWarning(`LSK ${side}${idx +1} pressed: ${keyLabel} (no action)`);
+            }
+            break;
+        }
+      }
+
+      handleExecute() {
+        if (this.currentPage === 'route' && this.inputBuffer.trim() !== '') {
+          let wp = this.inputBuffer.toUpperCase().replace(/\s+/g, '');
+          if (!this.isWaypointValid(wp)) {
+            this.addWarning(`Invalid waypoint: ${wp}`);
+            this.inputBuffer = '';
+            this.render();
+            return;
+          }
+          this.flightPlan.push({ waypoint: wp, info: 'User entered' });
+          this.inputBuffer = '';
+          this.selectedLegIndex = null;
+          this.addWarning(`Waypoint ${wp} added.`);
+          this.render();
+        } else if (this.currentPage === 'legs') {
+          if (this.selectedLegIndex !== null) {
+            this.addWarning(`LEG ${this.flightPlan[this.selectedLegIndex].waypoint} selected.`);
+          } else {
+            this.addWarning('Select a leg before EXEC');
+          }
+        } else if (this.currentPage === 'init') {
+          this.addWarning('INIT page EXEC: no input.');
+        } else if (this.currentPage === 'perf') {
+          this.addWarning('PERF page EXEC: not implemented.');
+        }
+      }
+
+      isWaypointValid(wp) {
+        return /^[A-Z0-9]{3,5}$/.test(wp);
+      }
+
+      deleteLeg(idx) {
+        if (idx >=0 && idx < this.flightPlan.length) {
+          const wp = this.flightPlan[idx].waypoint;
+          this.flightPlan.splice(idx,1);
+          this.selectedLegIndex = null;
+          this.addWarning(`Waypoint ${wp} deleted.`);
+          this.render();
+        }
+      }
+
+      changeLegSelection(direction) {
+        if (this.currentPage !== 'legs') return;
+        if (this.flightPlan.length === 0) {
+          this.addWarning('No legs present');
+          return;
+        }
+        if (this.selectedLegIndex === null) {
+          this.selectedLegIndex = 0;
+        } else {
+          this.selectedLegIndex += direction;
+          if (this.selectedLegIndex < 0) this.selectedLegIndex = this.flightPlan.length - 1;
+          if (this.selectedLegIndex >= this.flightPlan.length) this.selectedLegIndex = 0;
+        }
+        this.addWarning(`Selected leg ${this.flightPlan[this.selectedLegIndex].waypoint}`);
+        this.render();
+      }
+
+      addWarning(msg) {
+        this.warningMessage = msg;
+        this.renderWarning();
+      }
+
+      clearWarning() {
+        this.warningMessage = '';
+        this.renderWarning();
+      }
+
+      renderWarning() {
+        const existing = this.screen.querySelector('.fmc-warning');
+        if (existing) {
+          if (this.warningMessage === '') {
+            existing.remove();
+          } else {
+            existing.textContent = this.warningMessage;
+          }
+        } else if (this.warningMessage !== '') {
+          const warnEl = document.createElement('div');
+          warnEl.className = 'fmc-warning';
+          warnEl.setAttribute('role', 'alert');
+          warnEl.setAttribute('aria-live', 'assertive');
+          warnEl.textContent = this.warningMessage;
+          this.screen.appendChild(warnEl);
+        }
+      }
+
+      handleKeypad(key) {
+        if (key === 'CLR') {
+          this.inputBuffer = '';
+          this.clearWarning();
+          this.render();
+          return;
+        }
+        if (key === 'DEL') {
+          this.inputBuffer = this.inputBuffer.slice(0, -1);
+          this.clearWarning();
+          this.render();
+          return;
+        }
+        if (key === 'SPACE') {
+          if(this.inputBuffer.length > 0 && !this.inputBuffer.endsWith(' ')){
+            this.inputBuffer += ' ';
+            this.clearWarning();
+            this.render();
+          }
+          return;
+        }
+        if (key === 'EXEC') {
+          this.handleExecute();
+          return;
+        }
+        if (/^[A-Z]$/.test(key)) {
+          if (this.inputBuffer.length < 8) {
+            this.inputBuffer += key;
+            this.clearWarning();
+            this.render();
+          }
+        }
+      }
+
+      render() {
+        this.header.textContent = this.pages[this.currentPage].title;
+
+        // Update nav highlight
+        for (const [page, el] of Object.entries(this.navLinks)) {
+          if (page === this.currentPage) {
+            el.setAttribute('aria-current','page');
+          } else {
+            el.removeAttribute('aria-current');
+          }
+        }
+
+        // Left and right LSK buttons
+        const pageDef = this.pages[this.currentPage];
+        this.lskLeftButtons.forEach((btn,i) => {
+          const t = pageDef.leftKeys[i] || '';
+          btn.textContent = t;
+          btn.title = t;
+          btn.disabled = !t;
+        });
+        this.lskRightButtons.forEach((btn,i) => {
+          const t = pageDef.rightKeys[i] || '';
+          btn.textContent = t;
+          btn.title = t;
+          btn.disabled = !t;
+        });
+
+        // Render screen content per page
+        let html = '';
+        const inputBufHTML = `<span class="input-buffer">${this.escapeHtml(this.inputBuffer)}</span>`;
+        switch(this.currentPage) {
+          case 'init':
+            html += `\
+<h2>Initialize Flight</h2>
+<label>Departure Airport:</label> <span>${this.flightPlan.length>0 ? this.flightPlan[0].waypoint : ''}</span>\n
+<label>Arrival Airport:</label> <span>${this.flightPlan.length>0 ? this.flightPlan[this.flightPlan.length -1].waypoint : ''}</span>\n
+<label>Flight Number:</label> <span>AB123</span>\n
+<label>Cost Index:</label> <span>${this.performanceData.costIndex}</span>\n
+<div style="margin-top:0.8rem"><em>Use NAV RAD and VNAV keys for navigation setup</em></div>
+`;
+            break;
+          case 'route':
+            html += `\
+<h2>Flight Plan</h2>\n
+<label>Waypoint Input:</label> ${inputBufHTML}\n
+<table class="fmc-table" aria-label="Flight Plan Waypoints">
+  <thead><tr><th>#</th><th>ICAO</th><th>Description</th></tr></thead>
+  <tbody>\n`;
+            this.flightPlan.forEach((wp,i) => {
+              html+=`<tr><td>${i+1}</td><td>${wp.waypoint}</td><td>${this.escapeHtml(wp.info)}</td></tr>\n`;
+            });
+            html += `</tbody></table>\n
+<div style="margin-top:0.8rem"><em>Type waypoint then EXEC to add</em></div>
+`;
+            break;
+          case 'perf':
+            html += `\
+<h2>Performance Data</h2>\n
+<div class="screen-line"><label>Cost Index:</label><span class="value">${this.performanceData.costIndex}</span></div>\n
+<div class="screen-line"><label>Cruise Flight Level:</label><span class="value">FL${this.performanceData.cruiseFL}</span></div>\n
+<div class="screen-line"><label>Cruise IAS:</label><span class="value">${this.performanceData.cruiseIAS} knots</span></div>\n
+<div style="margin-top:0.6rem; font-style: italic; color: var(--clr-secondary);">More parameters coming soon...</div>
+`;
+            break;
+          case 'legs':
+            html += `\
+<h2>Legs</h2>\n
+<p>Select legs to modify or delete using the LSK keys.</p>\n
+<table class="fmc-table" aria-label="Flight Plan Legs">\n
+<thead><tr><th>#</th><th>Waypoint</th><th>Action</th></tr></thead><tbody>\n`;
+            this.flightPlan.forEach((wp, i) => {
+              const selected = (i === this.selectedLegIndex) ? ' style="background-color:#034d41cc;" aria-selected="true"' : '';
+              html += `<tr${selected}><td>${i+1}</td><td>${this.escapeHtml(wp.waypoint)}</td><td>`;
+              if (i === this.selectedLegIndex) {
+                html += `<button class="delete-wp" aria-label="Delete waypoint ${this.escapeHtml(wp.waypoint)}" data-index="${i}">&times;</button>`;
+              } else {
+                html += '&nbsp;';
+              }
+              html += `</td></tr>\n`;
+            });
+            html += `</tbody></table>\n`;
+            html += `<div style="margin-top:0.8rem"><em>Use NEXT/PREV to select leg. DEL WP to delete.</em></div>`;
+            break;
+          case 'menu':
+            html += `\
+<h2>Main Menu</h2>
+<ul>
+  <li><b>INIT</b> - Initialize Flight Data</li>
+  <li><b>RTE</b> - Route Page</li>
+  <li><b>PERF</b> - Performance Page</li>
+  <li><b>LEGS</b> - Edit Flight Legs</li>
+  <li><b>RAD NAV</b> - Radio Navigation (Coming soon)</li>
+  <li><b>VNAV</b> - Vertical Navigation (Coming soon)</li>
+</ul>
+`;
+            break;
+        }
+
+        this.screen.innerHTML = html;
+
+        // Setup delete buttons on legs page
+        if(this.currentPage === 'legs') {
+          this.screen.querySelectorAll('button.delete-wp').forEach(btn => {
+            btn.addEventListener('click', e => {
+              e.stopPropagation();
+              const idx = parseInt(e.target.getAttribute('data-index'));
+              if (!isNaN(idx)) {
+                this.deleteLeg(idx);
+              }
+            });
+          });
+        }
+      }
+
+      escapeHtml(text) {
+        return text.replace(/[&<>"']/g, m => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        })[m]);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      window.fmc = new FMC();
+    });
+  </script>
+</body>
+</html>
+
+```
